@@ -1,0 +1,64 @@
+# POSTGRES MODULE
+module add --name=org.postgresql --slot=main --resources=/opt/jboss/wildfly/customization/postgresql-42.2.16.jar --dependencies=javax.api,javax.transaction.api
+# module add --name=org.postgresql --slot=main --resources=/Users/costax/Documents/junk/servers/wildfly-20.0.1.Final/customization/postgresql-42.2.16.jar --dependencies=javax.api,javax.transaction.api
+
+# POSTGRES DRIVER
+/subsystem=datasources/jdbc-driver=postgres:add(driver-name="postgres",driver-module-name="org.postgresql",driver-xa-datasource-class-name=org.postgresql.xa.PGXADataSource)
+
+# DATASOURCE
+xa-data-source add --name=appDS \
+                   --jndi-name=java:jboss/datasources/appDS \
+                   --driver-name=postgres \
+                   --user-name=${env.DB_USER:dbadmin} \
+                   --password=${env.DB_PASSWORD:password} \
+                   --use-java-context=true \
+                   --use-ccm=true \
+                   --pool-prefill=true \
+                   --min-pool-size=${env.DB_MIN_POOL_SIZE:3} \
+                   --max-pool-size=${env.DB_MAX_POOL_SIZE:10} \
+                   --check-valid-connection-sql="SELECT 1" \
+                   --validate-on-match=false \
+                   --background-validation=true \
+                   --background-validation-millis=30000 \
+                   --valid-connection-checker-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLValidConnectionChecker \
+                   --exception-sorter-class-name=org.jboss.jca.adapters.jdbc.extensions.postgres.PostgreSQLExceptionSorter \
+                   --prepared-statements-cache-size=50 \
+                   --share-prepared-statements=true \
+                   --spy=true \
+                   --xa-datasource-properties=[{ ServerName=${env.DB_HOST:postgres}, PortNumber=${env.DB_PORT:5432}, DatabaseName=${env.DB_NAME:demodb} }]
+
+## UNDERTOW
+## configure undertow max post size this the definition of the max request size in bytes
+## /subsystem=undertow/server=default-server/http-listener=default/:write-attribute(name=max-post-size,value=123289600)
+
+## LOGGER
+/subsystem=logging/logger=org.hibernate:add(level=INFO)
+/subsystem=logging/logger=org.hibernate.SQL:add(level=DEBUG)
+/subsystem=logging/logger=org.hibernate.type.descriptor.sql:add(level=TRACE)
+/subsystem=logging/logger=org.hibernate.stat:add(level=DEBUG)
+/subsystem=logging/logger=org.hibernate.cache:add(level=DEBUG)
+/subsystem=logging/logger=org.hibernate.engine.transaction.internal.TransactionImpl:add(level=DEBUG)
+/subsystem=logging/logger=org.hibernate.engine.jdbc.batch:add(level=DEBUG)
+
+
+# Microprofile
+## docs - https://github.com/wildfly/wildfly/blob/master/docs/src/main/asciidoc/_admin-guide/
+## /extension=org.wildfly.extension.microprofile.
+
+/subsystem=jaxrs:write-attribute(name=resteasy-role-based-security, value=true)
+
+/extension=org.wildfly.extension.microprofile.openapi-smallrye:add()
+/subsystem=microprofile-openapi-smallrye:add()
+
+/extension=org.wildfly.extension.microprofile.fault-tolerance-smallrye:add
+/subsystem=microprofile-fault-tolerance-smallrye:add
+
+## Open Trace
+## https://gist.github.com/thomasdarimont/43df478331d21ef4cc0a72241c257070
+/socket-binding-group=standard-sockets/remote-destination-outbound-socket-binding=jaeger:add(host=${env.JAEGER_HOST:localhost}, port=6831)
+/subsystem=microprofile-opentracing-smallrye/jaeger-tracer=jaeger:remove()
+/subsystem=microprofile-opentracing-smallrye/jaeger-tracer=jaeger:add(sampler-type=const, sampler-param=1, reporter-log-spans=true, sender-binding=jaeger)
+/subsystem=microprofile-opentracing-smallrye/jaeger-tracer=jaeger:write-attribute(name="sender-endpoint", value="jaeger")
+/subsystem=microprofile-opentracing-smallrye:write-attribute(name=default-tracer, value=jaeger)
+
+
