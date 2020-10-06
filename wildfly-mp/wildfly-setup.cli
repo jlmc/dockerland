@@ -1,6 +1,6 @@
 # POSTGRES MODULE
 module add --name=org.postgresql --slot=main --resources=/opt/jboss/wildfly/customization/postgresql-42.2.16.jar --dependencies=javax.api,javax.transaction.api
-# module add --name=org.postgresql --slot=main --resources=/Users/costax/Documents/junk/servers/wildfly-20.0.1.Final/customization/postgresql-42.2.16.jar --dependencies=javax.api,javax.transaction.api
+# module add --name=org.postgresql --slot=main --resources=postgresql-42.2.16.jar --dependencies=javax.api,javax.transaction.api
 
 # POSTGRES DRIVER
 /subsystem=datasources/jdbc-driver=postgres:add(driver-name="postgres",driver-module-name="org.postgresql",driver-xa-datasource-class-name=org.postgresql.xa.PGXADataSource)
@@ -50,15 +50,19 @@ xa-data-source add --name=appDS \
 /extension=org.wildfly.extension.microprofile.openapi-smallrye:add()
 /subsystem=microprofile-openapi-smallrye:add()
 
-/extension=org.wildfly.extension.microprofile.fault-tolerance-smallrye:add
-/subsystem=microprofile-fault-tolerance-smallrye:add
+/extension=org.wildfly.extension.microprofile.fault-tolerance-smallrye:add()
+/subsystem=microprofile-fault-tolerance-smallrye:add()
 
 ## Open Trace
 ## https://gist.github.com/thomasdarimont/43df478331d21ef4cc0a72241c257070
+## https://www.wildfly.org/news/2020/03/19/Micro_Profile_OpenTracing_Comes_To_WildFly/
+#/socket-binding-group=standard-sockets/remote-destination-outbound-socket-binding=jaeger:add(host=${env.JAEGER_HOST:localhost}, port=6831)
+#/subsystem=microprofile-opentracing-smallrye/jaeger-tracer=jaeger:remove()
+#/subsystem=microprofile-opentracing-smallrye/jaeger-tracer=jaeger:add(sampler-type=const, sampler-param=1, reporter-log-spans=true, sender-binding=jaeger)
+#/subsystem=microprofile-opentracing-smallrye/jaeger-tracer=jaeger:write-attribute(name="sender-endpoint", value="http://${env.JAEGER_HOST:localhost}:14268/api/traces")
+#/subsystem=microprofile-opentracing-smallrye:write-attribute(name=default-tracer, value=jaeger)
+
+
 /socket-binding-group=standard-sockets/remote-destination-outbound-socket-binding=jaeger:add(host=${env.JAEGER_HOST:localhost}, port=6831)
-/subsystem=microprofile-opentracing-smallrye/jaeger-tracer=jaeger:remove()
-/subsystem=microprofile-opentracing-smallrye/jaeger-tracer=jaeger:add(sampler-type=const, sampler-param=1, reporter-log-spans=true, sender-binding=jaeger)
-/subsystem=microprofile-opentracing-smallrye/jaeger-tracer=jaeger:write-attribute(name="sender-endpoint", value="jaeger")
-/subsystem=microprofile-opentracing-smallrye:write-attribute(name=default-tracer, value=jaeger)
-
-
+/subsystem=microprofile-opentracing-smallrye/jaeger-tracer=jaeger-app:add(sampler-type=const, sampler-param=1, reporter-log-spans=true, sender-binding=jaeger)
+/subsystem=microprofile-opentracing-smallrye:write-attribute(name=default-tracer, value=jaeger-app)
